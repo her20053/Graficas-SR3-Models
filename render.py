@@ -4,6 +4,39 @@ from utilities import *
 # Importando libreria para manejo de colores
 from colors import *
 
+class Obj(object):
+  def __init__(self, filename):
+    with open(filename) as f:
+      self.lines = f.read().splitlines()
+
+    self.vertices = []
+    self.faces = []
+
+    for line in self.lines:
+
+      if line:
+
+        if ' ' not in line:
+          continue
+
+        prefix, value = line.split(' ', 1)
+
+        if value[0] == ' ':
+          value = '' + value[1:]
+        
+        if prefix == 'v':
+          self.vertices.append(
+            list(
+              map(float, value.split(' '))
+            )
+          )
+
+        if prefix == 'f':
+          self.faces.append([
+            list(map(int, face.split('/')))
+                for face in value.split(' ') if face != ''
+          ]) 
+
 class Render(object):
 
 	# Metodo ejecutado al inicializar la clase:
@@ -38,6 +71,9 @@ class Render(object):
             [self.clear_color for x in range(self.width)]
             for y in range(self.height)
         ]
+
+    def clamping(self, num):
+        return int(max(min(num, 255), 0))
 
 	# Metodo utilizado para dibujar el framebuffer en un archivo bmp
     def write(self, filename):
@@ -122,10 +158,14 @@ class Render(object):
 
                 threshold += dx * 2
 
-        # print(coordenadas)
-
         return coordenadas
     
+    def transformarVertice(self, vertex, scale, translate):
+        return [
+            ((vertex[0] * scale[0]) + translate[0]),
+            ((vertex[1] * scale[1]) + translate[1])
+        ]
+
     def convertirCoordenadas(self, x,y):
 
         x_ini = x + 1
@@ -141,3 +181,35 @@ class Render(object):
         yfinal = round(self.vp_y + calcuy)
 
         return [xfinal , yfinal]
+
+    def triangle(self, v1, v2, v3):
+        self.line(round(v1[0]), round(v1[1]), round(v2[0]), round(v2[1]))
+        self.line(round(v2[0]), round(v2[1]), round(v3[0]), round(v3[1]))
+        self.line(round(v3[0]), round(v3[1]), round(v1[0]), round(v1[1]))
+
+    def cube(self, v1, v2, v3, v4):
+        self.line(round(v1[0]), round(v1[1]), round(v2[0]), round(v2[1]))
+        self.line(round(v2[0]), round(v2[1]), round(v3[0]), round(v3[1]))
+        self.line(round(v3[0]), round(v3[1]), round(v4[0]), round(v4[1]))
+        self.line(round(v4[0]), round(v4[1]), round(v1[0]), round(v1[1]))
+
+    def renderObject(self, name, scaleFactor, translateFactor):
+        cube = Obj(name)
+
+        for face in cube.faces:
+            if len(face) == 4:
+
+                v1 = self.transformarVertice(cube.vertices[face[0][0] - 1], scaleFactor, translateFactor)
+                v2 = self.transformarVertice(cube.vertices[face[1][0] - 1], scaleFactor, translateFactor)
+                v3 = self.transformarVertice(cube.vertices[face[2][0] - 1], scaleFactor, translateFactor)
+                v4 = self.transformarVertice(cube.vertices[face[3][0] - 1], scaleFactor, translateFactor)
+
+                self.cube(v1, v2, v3, v4)
+            
+            if len(face) == 3:
+
+                v1 = self.transformarVertice(cube.vertices[face[0][0] - 1], scaleFactor, translateFactor)
+                v2 = self.transformarVertice(cube.vertices[face[1][0] - 1], scaleFactor, translateFactor)
+                v3 = self.transformarVertice(cube.vertices[face[2][0] - 1], scaleFactor, translateFactor)
+
+                self.triangle(v1, v2, v3)
